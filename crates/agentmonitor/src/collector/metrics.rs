@@ -17,6 +17,8 @@ pub struct ProcessEntry {
     pub cmd: String,
     pub cwd: Option<String>,
     pub started_unix: u64,
+    pub parent_pid: Option<u32>,
+    pub parent_name: Option<String>,
     pub samples: VecDeque<ProcessSample>,
     /// macOS "responsible PID" — the GUI app or terminal that originated this
     /// process, even after the immediate parent has exited and PPID has been
@@ -66,6 +68,8 @@ impl MetricsStore {
         cmd: String,
         cwd: Option<String>,
         started_unix: u64,
+        parent_pid: Option<u32>,
+        parent_name: Option<String>,
         responsible: Option<crate::collector::responsible::Responsible>,
         sample: ProcessSample,
     ) {
@@ -92,6 +96,8 @@ impl MetricsStore {
             cmd: cmd.clone(),
             cwd: cwd.clone(),
             started_unix,
+            parent_pid,
+            parent_name: parent_name.clone(),
             samples: VecDeque::with_capacity(self.capacity),
             responsible_pid: resp_pid,
             responsible_name: resp_name.clone(),
@@ -99,6 +105,8 @@ impl MetricsStore {
         entry.name = name;
         entry.cmd = cmd;
         entry.cwd = cwd;
+        entry.parent_pid = parent_pid;
+        entry.parent_name = parent_name;
         // Responsible PID is invariant for a process's lifetime, but we
         // refresh it anyway so a kernel that *did* refuse the first call
         // (and returned None) can be picked up on a later tick once the

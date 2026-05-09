@@ -43,10 +43,17 @@ impl CodexAdapter {
 }
 
 fn is_codex_cli_process_arg(arg: &str) -> bool {
-    arg.ends_with("/bin/codex")
-        || arg == "codex"
-        || arg.contains("/@openai/codex-")
-        || arg.contains("/codex-cli/")
+    // Cross-platform: `path_ends_with` and `path_contains` normalize
+    // backslashes and strip `.exe`/`.cmd` so Windows `codex.exe`,
+    // `codex.cmd`, and `C:\...\@openai\codex-...` arguments all match.
+    // `bare_name_matches` is restricted to no-path forms so the VSCode
+    // chatgpt extension's bundled `bin/macos-aarch64/codex` "app-server"
+    // process — which has basename `codex` but lives under a non-`bin`
+    // parent — still doesn't get scooped up.
+    super::process_match::path_ends_with(arg, "/bin/codex")
+        || super::process_match::bare_name_matches(arg, "codex")
+        || super::process_match::path_contains(arg, "/@openai/codex-")
+        || super::process_match::path_contains(arg, "/codex-cli/")
 }
 
 fn is_codex_desktop_process(path: &Path) -> bool {
@@ -829,5 +836,40 @@ mod tests {
         ];
 
         assert!(!adapter.matches_process(&cmd, None));
+    }
+
+    #[test]
+    fn matches_codex_cli_windows_paths() {
+        // Regression: Live Processes was empty on Windows because the
+        // pre-existing patterns required forward-slash separators and a bare
+        // `codex` literal — neither of which sysinfo emits for a Windows
+        // npm-installed CLI.
+        let adapter = CodexAdapter::new(None);
+        // Bare exe (native installer / PATH-resolved).
+        assert!(adapter.matches_process(&["codex.exe".to_string()], None));
+        // npm-installed CLI runs as node.exe with cli.js. The /codex-cli/
+        // substring catches the @openai/codex-cli package path.
+        assert!(adapter.matches_process(
+            &[
+                "C:\\Program Files\\nodejs\\node.exe".to_string(),
+                "C:\\Users\\yjw\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex-cli\\bin\\codex.js"
+                    .to_string(),
+            ],
+            None,
+        ));
+        // The /@openai/codex- substring also catches alternative package layouts.
+        assert!(adapter.matches_process(
+            &[
+                "C:\\Program Files\\nodejs\\node.exe".to_string(),
+                "C:\\Users\\yjw\\AppData\\Roaming\\npm\\node_modules\\@openai\\codex-foo\\index.js"
+                    .to_string(),
+            ],
+            None,
+        ));
+        // Negative: unrelated exe must not match.
+        assert!(!adapter.matches_process(
+            &["C:\\Windows\\System32\\notepad.exe".to_string()],
+            None,
+        ));
     }
 }

@@ -5,6 +5,7 @@ pub mod conversation;
 pub mod gemini;
 pub mod hermes;
 pub mod opencode;
+pub(crate) mod process_match;
 pub mod types;
 
 use std::path::Path;

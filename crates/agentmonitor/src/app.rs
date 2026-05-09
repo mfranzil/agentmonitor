@@ -981,6 +981,8 @@ mod tests {
             cmd: "codex".into(),
             cwd: Some("/repos/AgentMonitor".into()),
             started_unix: 0,
+            parent_pid: None,
+            parent_name: None,
             samples: VecDeque::new(),
             responsible_pid: None,
             responsible_name: None,

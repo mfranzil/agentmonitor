@@ -61,8 +61,19 @@ impl AgentAdapter for ClaudeAdapter {
         self.root.iter().cloned().collect()
     }
     fn matches_process(&self, cmd: &[String], _exe: Option<&Path>) -> bool {
-        cmd.iter()
-            .any(|s| s.ends_with("/bin/claude") || s == "claude" || s.contains("/.claude/local/"))
+        // Cross-platform match: handles Unix paths (`/usr/local/bin/claude`,
+        // `/.claude/local/...`), bare names (`claude`, `claude.exe`,
+        // `claude.cmd`), Windows backslash paths (`C:\...\.claude\local\...`),
+        // and the npm-installed case where `node.exe` runs
+        // `node_modules\@anthropic-ai\claude-code\cli.js`. The original
+        // Unix-only matching silently rejected every running agent on
+        // Windows so the Live Processes panel was always empty.
+        cmd.iter().any(|s| {
+            super::process_match::path_ends_with(s, "/bin/claude")
+                || super::process_match::bare_name_matches(s, "claude")
+                || super::process_match::path_contains(s, "/.claude/local/")
+                || super::process_match::path_contains(s, "/@anthropic-ai/claude-code")
+        })
     }
 
     async fn parse_meta_fast(&self, path: &Path) -> Result<SessionMeta> {
@@ -1064,5 +1075,58 @@ mod tests {
             .unwrap()
             .with_timezone(&Utc);
         assert_eq!(meta.updated_at, Some(expected));
+    }
+
+    #[test]
+    fn matches_claude_cli_unix_paths() {
+        let adapter = ClaudeAdapter::new(None);
+        // Bare invocation (PATH-resolved).
+        assert!(adapter.matches_process(&["claude".to_string()], None));
+        // Standard /usr/local/bin form.
+        assert!(adapter.matches_process(&["/usr/local/bin/claude".to_string()], None));
+        // The `~/.claude/local/...` install (volta / nvm-style shim).
+        assert!(adapter.matches_process(
+            &["/Users/u/.claude/local/node_modules/.bin/claude".to_string()],
+            None,
+        ));
+        // Should NOT match unrelated names.
+        assert!(!adapter.matches_process(&["claudette".to_string()], None));
+        assert!(!adapter.matches_process(&["/usr/bin/codex".to_string()], None));
+    }
+
+    #[test]
+    fn matches_claude_cli_windows_paths() {
+        // Regression: the Live Processes panel on Windows was always empty
+        // because the original Unix-only `s == "claude" || s.ends_with("/bin/claude")`
+        // check rejected every Windows-shaped argv entry. These forms are
+        // what `sysinfo` actually returns for a running Claude Code on
+        // Windows under different install methods.
+        let adapter = ClaudeAdapter::new(None);
+        // Bare exe (PATH-resolved, native installer drops claude.exe).
+        assert!(adapter.matches_process(&["claude.exe".to_string()], None));
+        // Common case: npm-installed CLI runs as `node.exe` with the cli.js
+        // as argv[1]. The .cmd shim never appears as a long-running process,
+        // so we match the @anthropic-ai/claude-code package path instead.
+        assert!(adapter.matches_process(
+            &[
+                "C:\\Program Files\\nodejs\\node.exe".to_string(),
+                "C:\\Users\\yjw\\AppData\\Roaming\\npm\\node_modules\\@anthropic-ai\\claude-code\\cli.js".to_string(),
+            ],
+            None,
+        ));
+        // Local `.claude\local\...` install with backslashes (the install
+        // script puts the runtime under `~/.claude/local/`).
+        assert!(adapter.matches_process(
+            &[
+                "C:\\Users\\yjw\\.claude\\local\\node.exe".to_string(),
+                "C:\\Users\\yjw\\.claude\\local\\node_modules\\@anthropic-ai\\claude-code\\cli.js".to_string(),
+            ],
+            None,
+        ));
+        // Mixed-separator path (some tools normalize even on Windows).
+        assert!(adapter.matches_process(
+            &["C:/Users/yjw/.claude/local/bin/claude.exe".to_string()],
+            None,
+        ));
     }
 }

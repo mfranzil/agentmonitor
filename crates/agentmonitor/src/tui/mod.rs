@@ -22,7 +22,7 @@ pub mod widgets;
 
 /// Below this width, Sessions falls back to a single-pane list (detail
 /// hides; press `o`/Enter to inspect via the full-screen Viewer).
-pub const SESSIONS_TWO_PANE_MIN_WIDTH: u16 = 110;
+pub const SESSIONS_TWO_PANE_MIN_WIDTH: u16 = 88;
 
 /// Below this width, Dashboard's middle row stacks Activity over Top
 /// Projects vertically instead of side-by-side.

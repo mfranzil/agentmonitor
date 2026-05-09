@@ -105,11 +105,15 @@ impl AgentAdapter for HermesAdapter {
     }
 
     fn matches_process(&self, cmd: &[String], _exe: Option<&Path>) -> bool {
+        // Cross-platform: backslash-separator and `.exe`/`.cmd`/`.bat` wrapper
+        // matching for Windows. The `hermes_cli.main` substring already works
+        // verbatim on Windows because Python module dotted-paths don't carry
+        // path separators.
         cmd.iter().any(|s| {
-            s == "hermes"
-                || s.ends_with("/hermes")
+            super::process_match::bare_name_matches(s, "hermes")
+                || super::process_match::path_ends_with(s, "/hermes")
                 || s.contains("hermes_cli.main")
-                || s.contains("hermes_cli/main.py")
+                || super::process_match::path_contains(s, "hermes_cli/main.py")
         })
     }
 
@@ -736,6 +740,32 @@ mod tests {
             None,
         ));
         assert!(!adapter.matches_process(&["claude".to_string()], None));
+    }
+
+    #[test]
+    fn matches_hermes_process_windows() {
+        let adapter = HermesAdapter::new(None);
+        // Bare exe.
+        assert!(adapter.matches_process(&["hermes.exe".to_string()], None));
+        // Windows venv `python.exe -m hermes_cli.main` (the dotted module
+        // path is identical across OSes).
+        assert!(adapter.matches_process(
+            &[
+                "C:\\Users\\u\\.hermes\\hermes-agent\\venv\\Scripts\\python.exe".to_string(),
+                "-m".to_string(),
+                "hermes_cli.main".to_string(),
+                "chat".to_string(),
+            ],
+            None,
+        ));
+        // Windows venv with the script form (`hermes_cli/main.py` substring).
+        assert!(adapter.matches_process(
+            &[
+                "C:\\Users\\u\\.hermes\\hermes-agent\\venv\\Scripts\\python.exe".to_string(),
+                "C:\\Users\\u\\.hermes\\hermes-agent\\hermes_cli\\main.py".to_string(),
+            ],
+            None,
+        ));
     }
 
     #[test]

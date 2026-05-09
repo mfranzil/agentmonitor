@@ -27,7 +27,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let body = if two_pane {
         Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Min(60), Constraint::Min(40)])
+            .constraints([Constraint::Percentage(58), Constraint::Percentage(42)])
             .split(outer[1])
     } else {
         Layout::default()

@@ -14,6 +14,7 @@ struct Candidate {
     name: String,
     cmd: String,
     cwd: Option<String>,
+    parent_name: Option<String>,
     started_unix: u64,
     rss_kb: u64,
     cpu: f32,
@@ -62,15 +63,21 @@ pub async fn run(
             else {
                 continue;
             };
+            let parent_pid = proc.parent();
+            let parent_name = parent_pid
+                .and_then(|ppid| system.process(ppid))
+                .map(|parent| parent.name().to_string_lossy().to_string())
+                .filter(|name| !name.is_empty());
             let pid_u32 = pid.as_u32();
             candidates.insert(
                 pid_u32,
                 Candidate {
                     agent_id,
-                    ppid: proc.parent().map(|p| p.as_u32()),
+                    ppid: parent_pid.map(|p| p.as_u32()),
                     name: proc.name().to_string_lossy().to_string(),
                     cmd: cmd.join(" "),
                     cwd: proc.cwd().map(|p| p.display().to_string()),
+                    parent_name,
                     started_unix: proc.start_time(),
                     rss_kb: proc.memory() / 1024,
                     cpu: proc.cpu_usage(),
@@ -116,6 +123,8 @@ pub async fn run(
                 cand.cmd,
                 cand.cwd,
                 cand.started_unix,
+                cand.ppid,
+                cand.parent_name,
                 responsible,
                 sample,
             );

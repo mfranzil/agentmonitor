@@ -70,10 +70,13 @@ impl AgentAdapter for GeminiAdapter {
     }
 
     fn matches_process(&self, cmd: &[String], _exe: Option<&Path>) -> bool {
+        // Cross-platform: handle Windows `.exe`/`.cmd` wrappers and
+        // backslash separators in the npm install path. See
+        // adapter/process_match.rs for the rationale.
         cmd.iter().any(|s| {
-            s.ends_with("/gemini")
-                || s == "gemini"
-                || s.contains("/@google/gemini-cli")
+            super::process_match::path_ends_with(s, "/gemini")
+                || super::process_match::bare_name_matches(s, "gemini")
+                || super::process_match::path_contains(s, "/@google/gemini-cli")
         })
     }
 
@@ -534,6 +537,26 @@ mod tests {
         ));
         assert!(!adapter.matches_process(
             &["node".to_string(), "server.js".to_string()],
+            None
+        ));
+    }
+
+    #[test]
+    fn test_matches_process_windows() {
+        // Regression: gemini was invisible in Live Processes on Windows
+        // because the matchers required `/`-prefixed paths and a bare
+        // `gemini` literal.
+        let adapter = GeminiAdapter::new(None);
+        // Bare exe.
+        assert!(adapter.matches_process(&["gemini.exe".to_string()], None));
+        // npm-installed CLI: node.exe runs the cli script. The
+        // /@google/gemini-cli substring catches the package path.
+        assert!(adapter.matches_process(
+            &[
+                "C:\\Program Files\\nodejs\\node.exe".to_string(),
+                "C:\\Users\\yjw\\AppData\\Roaming\\npm\\node_modules\\@google\\gemini-cli\\dist\\index.js"
+                    .to_string(),
+            ],
             None
         ));
     }

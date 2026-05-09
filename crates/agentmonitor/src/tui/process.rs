@@ -74,11 +74,7 @@ fn render_table(
             // resolution failed (older macOS / SIP / non-mac) fall through to
             // a dash so a column of mostly-resolved rows stays visually
             // aligned.
-            let launcher = match (&p.responsible_name, p.responsible_pid) {
-                (Some(name), Some(rpid)) if rpid == p.pid => name.clone(),
-                (Some(name), Some(rpid)) => format!("{name} ({rpid})"),
-                _ => "-".to_string(),
-            };
+            let launcher = launcher_label(p);
             Row::new(vec![
                 Cell::from(agent_label),
                 Cell::from(p.pid.to_string()),
@@ -119,6 +115,20 @@ fn render_table(
     frame.render_stateful_widget(table, area, &mut table_state);
 }
 
+fn launcher_label(p: &crate::collector::metrics::ProcessEntry) -> String {
+    match (&p.responsible_name, p.responsible_pid) {
+        (Some(name), Some(rpid)) if rpid == p.pid => return name.clone(),
+        (Some(name), Some(rpid)) => return format!("{name} ({rpid})"),
+        _ => {}
+    }
+
+    match (&p.parent_name, p.parent_pid) {
+        (Some(name), Some(ppid)) if ppid == p.pid => name.clone(),
+        (Some(name), Some(ppid)) => format!("{name} ({ppid})"),
+        _ => "-".to_string(),
+    }
+}
+
 fn format_uptime(secs: u64) -> String {
     if secs < 60 {
         format!("{secs}s")
@@ -142,4 +152,56 @@ fn shorten_path(s: &str, max: usize) -> String {
     let take = max.saturating_sub(1);
     let tail: String = s.chars().skip(count - take).collect();
     format!("…{tail}")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::collector::metrics::ProcessEntry;
+    use std::collections::VecDeque;
+
+    fn entry() -> ProcessEntry {
+        ProcessEntry {
+            agent: "codex",
+            pid: 42,
+            name: "codex".into(),
+            cmd: "codex".into(),
+            cwd: None,
+            started_unix: 0,
+            parent_pid: None,
+            parent_name: None,
+            samples: VecDeque::new(),
+            responsible_pid: None,
+            responsible_name: None,
+        }
+    }
+
+    #[test]
+    fn launcher_label_uses_responsible_process_first() {
+        let mut p = entry();
+        p.parent_pid = Some(7);
+        p.parent_name = Some("powershell".into());
+        p.responsible_pid = Some(9);
+        p.responsible_name = Some("Code".into());
+
+        assert_eq!(launcher_label(&p), "Code (9)");
+    }
+
+    #[test]
+    fn launcher_label_falls_back_to_parent_process() {
+        let mut p = entry();
+        p.parent_pid = Some(7);
+        p.parent_name = Some("powershell".into());
+
+        assert_eq!(launcher_label(&p), "powershell (7)");
+    }
+
+    #[test]
+    fn launcher_label_omits_self_pid() {
+        let mut p = entry();
+        p.responsible_pid = Some(42);
+        p.responsible_name = Some("codex".into());
+
+        assert_eq!(launcher_label(&p), "codex");
+    }
 }

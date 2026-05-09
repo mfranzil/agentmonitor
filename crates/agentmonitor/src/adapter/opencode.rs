@@ -82,8 +82,11 @@ impl AgentAdapter for OpencodeAdapter {
     }
 
     fn matches_process(&self, cmd: &[String], _exe: Option<&Path>) -> bool {
-        cmd.iter()
-            .any(|s| s == "opencode" || s.contains("/opencode") || s.ends_with("opencode"))
+        // Cross-platform: handle Windows backslash paths and exe wrappers.
+        cmd.iter().any(|s| {
+            super::process_match::bare_name_matches(s, "opencode")
+                || super::process_match::path_contains(s, "/opencode")
+        })
     }
 
     fn needs_fs_stat(&self) -> bool {
@@ -617,6 +620,27 @@ mod tests {
         assert!(adapter.matches_process(&["opencode".to_string()], None));
         assert!(adapter.matches_process(&["/usr/bin/opencode".to_string()], None));
         assert!(!adapter.matches_process(&["claude".to_string()], None));
+    }
+
+    #[test]
+    fn matches_opencode_process_windows() {
+        let adapter = OpencodeAdapter::new(None);
+        // Bare exe.
+        assert!(adapter.matches_process(&["opencode.exe".to_string()], None));
+        // node-launched cli with /opencode/ in the path.
+        assert!(adapter.matches_process(
+            &[
+                "C:\\Program Files\\nodejs\\node.exe".to_string(),
+                "C:\\Users\\yjw\\AppData\\Roaming\\npm\\node_modules\\opencode\\bin\\opencode.js"
+                    .to_string(),
+            ],
+            None,
+        ));
+        // Native installer drop point.
+        assert!(adapter.matches_process(
+            &["C:\\Program Files\\opencode\\opencode.exe".to_string()],
+            None,
+        ));
     }
 
     #[test]
