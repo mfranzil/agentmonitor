@@ -244,8 +244,14 @@ impl AgentAdapter for GeminiAdapter {
                     // Thinking blocks
                     if let Some(thoughts) = msg.get("thoughts").and_then(|t| t.as_array()) {
                         for thought in thoughts {
-                            let subject = thought.get("subject").and_then(|s| s.as_str()).unwrap_or("");
-                            let desc = thought.get("description").and_then(|s| s.as_str()).unwrap_or("");
+                            let subject = thought
+                                .get("subject")
+                                .and_then(|s| s.as_str())
+                                .unwrap_or("");
+                            let desc = thought
+                                .get("description")
+                                .and_then(|s| s.as_str())
+                                .unwrap_or("");
                             let mut text = String::new();
                             if !subject.is_empty() {
                                 text.push_str(subject);
@@ -265,7 +271,11 @@ impl AgentAdapter for GeminiAdapter {
                     // Tool calls
                     if let Some(tool_calls) = msg.get("toolCalls").and_then(|t| t.as_array()) {
                         for tc in tool_calls {
-                            let name = tc.get("name").and_then(|n| n.as_str()).unwrap_or("?").to_string();
+                            let name = tc
+                                .get("name")
+                                .and_then(|n| n.as_str())
+                                .unwrap_or("?")
+                                .to_string();
                             let args = tc.get("args").cloned().unwrap_or(Value::Null);
                             let preview = tc
                                 .get("displayName")
@@ -301,7 +311,10 @@ impl AgentAdapter for GeminiAdapter {
                 }
                 "error" => {
                     let text = msg.get("content").and_then(|c| c.as_str()).unwrap_or("");
-                    (MessageRole::Other("error".to_string()), vec![Block::Text(text.to_string())])
+                    (
+                        MessageRole::Other("error".to_string()),
+                        vec![Block::Text(text.to_string())],
+                    )
                 }
                 _ => continue,
             };
@@ -523,22 +536,13 @@ mod tests {
     #[test]
     fn test_matches_process() {
         let adapter = GeminiAdapter::new(None);
-        assert!(adapter.matches_process(
-            &["/usr/local/bin/gemini".to_string()],
-            None
-        ));
-        assert!(adapter.matches_process(
-            &["gemini".to_string()],
-            None
-        ));
+        assert!(adapter.matches_process(&["/usr/local/bin/gemini".to_string()], None));
+        assert!(adapter.matches_process(&["gemini".to_string()], None));
         assert!(adapter.matches_process(
             &["/node_modules/@google/gemini-cli/dist/index.js".to_string()],
             None
         ));
-        assert!(!adapter.matches_process(
-            &["node".to_string(), "server.js".to_string()],
-            None
-        ));
+        assert!(!adapter.matches_process(&["node".to_string(), "server.js".to_string()], None));
     }
 
     #[test]
@@ -677,7 +681,10 @@ mod tests {
                 }
                 "error" => {
                     let text = msg.get("content").and_then(|c| c.as_str()).unwrap_or("");
-                    (MessageRole::Other("error".to_string()), vec![Block::Text(text.to_string())])
+                    (
+                        MessageRole::Other("error".to_string()),
+                        vec![Block::Text(text.to_string())],
+                    )
                 }
                 _ => continue,
             };

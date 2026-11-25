@@ -46,93 +46,135 @@ impl ModelPrice {
 /// would match. The list is small enough that linear scan is fine.
 const PRICES: &[(&str, ModelPrice)] = &[
     // ── Claude family (Anthropic, 2026-05 pricing) ──
-    ("claude-opus-4.7", ModelPrice {
-        input_per_mtok: 15.0,
-        output_per_mtok: 75.0,
-        cache_read_per_mtok: 1.50,
-        cache_creation_per_mtok: 18.75,
-    }),
-    ("claude-opus-4", ModelPrice {
-        input_per_mtok: 15.0,
-        output_per_mtok: 75.0,
-        cache_read_per_mtok: 1.50,
-        cache_creation_per_mtok: 18.75,
-    }),
-    ("claude-opus", ModelPrice {
-        input_per_mtok: 15.0,
-        output_per_mtok: 75.0,
-        cache_read_per_mtok: 1.50,
-        cache_creation_per_mtok: 18.75,
-    }),
-    ("claude-sonnet-4", ModelPrice {
-        input_per_mtok: 3.0,
-        output_per_mtok: 15.0,
-        cache_read_per_mtok: 0.30,
-        cache_creation_per_mtok: 3.75,
-    }),
-    ("claude-sonnet", ModelPrice {
-        input_per_mtok: 3.0,
-        output_per_mtok: 15.0,
-        cache_read_per_mtok: 0.30,
-        cache_creation_per_mtok: 3.75,
-    }),
-    ("claude-haiku", ModelPrice {
-        input_per_mtok: 0.80,
-        output_per_mtok: 4.0,
-        cache_read_per_mtok: 0.08,
-        cache_creation_per_mtok: 1.0,
-    }),
+    (
+        "claude-opus-4.7",
+        ModelPrice {
+            input_per_mtok: 15.0,
+            output_per_mtok: 75.0,
+            cache_read_per_mtok: 1.50,
+            cache_creation_per_mtok: 18.75,
+        },
+    ),
+    (
+        "claude-opus-4",
+        ModelPrice {
+            input_per_mtok: 15.0,
+            output_per_mtok: 75.0,
+            cache_read_per_mtok: 1.50,
+            cache_creation_per_mtok: 18.75,
+        },
+    ),
+    (
+        "claude-opus",
+        ModelPrice {
+            input_per_mtok: 15.0,
+            output_per_mtok: 75.0,
+            cache_read_per_mtok: 1.50,
+            cache_creation_per_mtok: 18.75,
+        },
+    ),
+    (
+        "claude-sonnet-4",
+        ModelPrice {
+            input_per_mtok: 3.0,
+            output_per_mtok: 15.0,
+            cache_read_per_mtok: 0.30,
+            cache_creation_per_mtok: 3.75,
+        },
+    ),
+    (
+        "claude-sonnet",
+        ModelPrice {
+            input_per_mtok: 3.0,
+            output_per_mtok: 15.0,
+            cache_read_per_mtok: 0.30,
+            cache_creation_per_mtok: 3.75,
+        },
+    ),
+    (
+        "claude-haiku",
+        ModelPrice {
+            input_per_mtok: 0.80,
+            output_per_mtok: 4.0,
+            cache_read_per_mtok: 0.08,
+            cache_creation_per_mtok: 1.0,
+        },
+    ),
     // ── OpenAI / Codex ──
-    ("gpt-5", ModelPrice {
-        input_per_mtok: 5.0,
-        output_per_mtok: 15.0,
-        cache_read_per_mtok: 1.25,
-        cache_creation_per_mtok: 5.0,
-    }),
-    ("gpt-4.1", ModelPrice {
-        input_per_mtok: 2.50,
-        output_per_mtok: 10.0,
-        cache_read_per_mtok: 0.625,
-        cache_creation_per_mtok: 2.50,
-    }),
-    ("gpt-4o", ModelPrice {
-        input_per_mtok: 2.50,
-        output_per_mtok: 10.0,
-        cache_read_per_mtok: 1.25,
-        cache_creation_per_mtok: 2.50,
-    }),
-    ("o1", ModelPrice {
-        input_per_mtok: 15.0,
-        output_per_mtok: 60.0,
-        cache_read_per_mtok: 7.50,
-        cache_creation_per_mtok: 15.0,
-    }),
+    (
+        "gpt-5",
+        ModelPrice {
+            input_per_mtok: 5.0,
+            output_per_mtok: 15.0,
+            cache_read_per_mtok: 1.25,
+            cache_creation_per_mtok: 5.0,
+        },
+    ),
+    (
+        "gpt-4.1",
+        ModelPrice {
+            input_per_mtok: 2.50,
+            output_per_mtok: 10.0,
+            cache_read_per_mtok: 0.625,
+            cache_creation_per_mtok: 2.50,
+        },
+    ),
+    (
+        "gpt-4o",
+        ModelPrice {
+            input_per_mtok: 2.50,
+            output_per_mtok: 10.0,
+            cache_read_per_mtok: 1.25,
+            cache_creation_per_mtok: 2.50,
+        },
+    ),
+    (
+        "o1",
+        ModelPrice {
+            input_per_mtok: 15.0,
+            output_per_mtok: 60.0,
+            cache_read_per_mtok: 7.50,
+            cache_creation_per_mtok: 15.0,
+        },
+    ),
     // Generic OpenAI catch-all for the codex.app's "openai" model string.
-    ("openai", ModelPrice {
-        input_per_mtok: 2.50,
-        output_per_mtok: 10.0,
-        cache_read_per_mtok: 0.625,
-        cache_creation_per_mtok: 2.50,
-    }),
+    (
+        "openai",
+        ModelPrice {
+            input_per_mtok: 2.50,
+            output_per_mtok: 10.0,
+            cache_read_per_mtok: 0.625,
+            cache_creation_per_mtok: 2.50,
+        },
+    ),
     // ── Gemini ──
-    ("gemini-2", ModelPrice {
-        input_per_mtok: 1.25,
-        output_per_mtok: 5.0,
-        cache_read_per_mtok: 0.3125,
-        cache_creation_per_mtok: 1.25,
-    }),
-    ("gemini-1.5", ModelPrice {
-        input_per_mtok: 1.25,
-        output_per_mtok: 5.0,
-        cache_read_per_mtok: 0.3125,
-        cache_creation_per_mtok: 1.25,
-    }),
-    ("gemini", ModelPrice {
-        input_per_mtok: 1.25,
-        output_per_mtok: 5.0,
-        cache_read_per_mtok: 0.3125,
-        cache_creation_per_mtok: 1.25,
-    }),
+    (
+        "gemini-2",
+        ModelPrice {
+            input_per_mtok: 1.25,
+            output_per_mtok: 5.0,
+            cache_read_per_mtok: 0.3125,
+            cache_creation_per_mtok: 1.25,
+        },
+    ),
+    (
+        "gemini-1.5",
+        ModelPrice {
+            input_per_mtok: 1.25,
+            output_per_mtok: 5.0,
+            cache_read_per_mtok: 0.3125,
+            cache_creation_per_mtok: 1.25,
+        },
+    ),
+    (
+        "gemini",
+        ModelPrice {
+            input_per_mtok: 1.25,
+            output_per_mtok: 5.0,
+            cache_read_per_mtok: 0.3125,
+            cache_creation_per_mtok: 1.25,
+        },
+    ),
 ];
 
 /// Look up the price for a model id. Case-insensitive prefix match; returns
@@ -156,7 +198,12 @@ pub fn lookup(model: &str) -> Option<ModelPrice> {
 pub fn aggregate_cost(sessions: &[crate::adapter::types::SessionMeta]) -> f64 {
     sessions
         .iter()
-        .filter_map(|s| s.model.as_deref().and_then(lookup).map(|p| p.cost_usd(&s.tokens)))
+        .filter_map(|s| {
+            s.model
+                .as_deref()
+                .and_then(lookup)
+                .map(|p| p.cost_usd(&s.tokens))
+        })
         .sum()
 }
 

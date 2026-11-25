@@ -8,7 +8,10 @@ use tokio::sync::Notify;
 
 use crate::adapter::conversation::ConversationEvent;
 use crate::adapter::types::{MessagePreview, SessionMeta, SessionStatus};
-use crate::adapter::{ClaudeAdapter, ClaudeDesktopAdapter, CodexAdapter, DynAdapter, GeminiAdapter, HermesAdapter, OpencodeAdapter};
+use crate::adapter::{
+    ClaudeAdapter, ClaudeDesktopAdapter, CodexAdapter, DynAdapter, GeminiAdapter, HermesAdapter,
+    OpencodeAdapter,
+};
 use crate::collector::diagnostics::DiagnosticsStore;
 use crate::collector::metrics::{MetricsStore, ProcessEntry};
 use crate::collector::token_refresh::TokenCache;
@@ -293,7 +296,9 @@ impl AppState {
                 if !starred.is_empty() {
                     idxs.sort_by(|&a, &b| {
                         is_starred(b).cmp(&is_starred(a)).then_with(|| {
-                            self.sessions[b].updated_at.cmp(&self.sessions[a].updated_at)
+                            self.sessions[b]
+                                .updated_at
+                                .cmp(&self.sessions[a].updated_at)
                         })
                     });
                 }
@@ -587,7 +592,9 @@ impl App {
         let hermes_db = config.hermes_root.as_ref().map(|r| r.join("state.db"));
         let adapters: Vec<DynAdapter> = vec![
             Arc::new(ClaudeAdapter::new(config.claude_root.clone())),
-            Arc::new(ClaudeDesktopAdapter::new(config.claude_desktop_root.clone())),
+            Arc::new(ClaudeDesktopAdapter::new(
+                config.claude_desktop_root.clone(),
+            )),
             Arc::new(CodexAdapter::new(config.codex_root.clone())),
             Arc::new(GeminiAdapter::new(config.gemini_root.clone())),
             Arc::new(HermesAdapter::new(hermes_db)),
@@ -634,13 +641,21 @@ impl App {
             let should_prompt = settings.star_prompt_count < 3
                 && (new_count == 5 || (new_count > 5 && (new_count - 5) % 20 == 0));
             if should_prompt {
-                let key_display = settings.keybindings.binding_display(crate::keybinding::KeyAction::Star);
+                let key_display = settings
+                    .keybindings
+                    .binding_display(crate::keybinding::KeyAction::Star);
                 let msg = match settings.language {
                     crate::settings::Language::Zh => {
-                        format!("喜欢 Agent Monitor 吗？按 {} 在 GitHub 上加星支持我们", key_display)
+                        format!(
+                            "喜欢 Agent Monitor 吗？按 {} 在 GitHub 上加星支持我们",
+                            key_display
+                        )
                     }
                     _ => {
-                        format!("Enjoying Agent Monitor? Press {} to star us on GitHub", key_display)
+                        format!(
+                            "Enjoying Agent Monitor? Press {} to star us on GitHub",
+                            key_display
+                        )
                     }
                 };
                 app.state.write().toast = Some(msg);

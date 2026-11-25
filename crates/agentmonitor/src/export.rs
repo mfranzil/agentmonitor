@@ -132,8 +132,7 @@ fn append_block(out: &mut String, block: &Block) {
 pub fn default_export_path(agent: &str, short_id: &str) -> Result<PathBuf> {
     let home = std::env::var("HOME").context("HOME not set")?;
     let dir = Path::new(&home).join("Downloads").join("agent-monitor");
-    std::fs::create_dir_all(&dir)
-        .with_context(|| format!("create_dir_all {}", dir.display()))?;
+    std::fs::create_dir_all(&dir).with_context(|| format!("create_dir_all {}", dir.display()))?;
     Ok(dir.join(format!("{agent}-{short_id}.md")))
 }
 
@@ -141,8 +140,7 @@ pub fn default_export_path(agent: &str, short_id: &str) -> Result<PathBuf> {
 /// files if the process is interrupted mid-write. Returns the final path.
 pub fn write_atomic(path: &Path, content: &str) -> Result<()> {
     let tmp = path.with_extension("md.tmp");
-    std::fs::write(&tmp, content)
-        .with_context(|| format!("write tmp {}", tmp.display()))?;
+    std::fs::write(&tmp, content).with_context(|| format!("write tmp {}", tmp.display()))?;
     std::fs::rename(&tmp, path)
         .with_context(|| format!("rename {} → {}", tmp.display(), path.display()))?;
     Ok(())
@@ -229,10 +227,7 @@ mod tests {
     fn markdown_includes_role_headers_and_text() {
         let events = vec![
             ev(MessageRole::User, vec![Block::Text("hello".into())]),
-            ev(
-                MessageRole::Assistant,
-                vec![Block::Text("hi there".into())],
-            ),
+            ev(MessageRole::Assistant, vec![Block::Text("hi there".into())]),
         ];
         let md = to_markdown(&events);
         assert!(md.contains("## User"));

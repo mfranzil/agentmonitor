@@ -189,9 +189,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         .collect();
 
     let mut list_state = ListState::default();
-    list_state.select(Some(
-        app.selected_setting.min(SettingsItem::all().len()),
-    ));
+    list_state.select(Some(app.selected_setting.min(SettingsItem::all().len())));
 
     let mut items = items;
     // GitHub link row. We render plain text — embedding OSC 8 hyperlink escapes
@@ -242,9 +240,10 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     let cache_pct = diag.token_cache_hit_rate() * 100.0;
     let debounce_pct = diag.fs_watch_debounce_ratio() * 100.0;
     let diagnostics_lines = vec![
-        Line::from(vec![
-            Span::styled(t("settings.diagnostics.title"), theme::title()),
-        ]),
+        Line::from(vec![Span::styled(
+            t("settings.diagnostics.title"),
+            theme::title(),
+        )]),
         Line::from(vec![
             Span::styled(
                 pad_display_width(t("settings.diagnostics.token_refresh"), 28),

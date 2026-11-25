@@ -9,8 +9,8 @@ use futures::StreamExt;
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
 
-use crate::adapter::{adapter_for_path, DynAdapter};
 use crate::adapter::types::SessionStatus;
+use crate::adapter::{adapter_for_path, DynAdapter};
 use crate::app::{
     toggle_filter_token, App, ConversationCache, DeleteConfirm, ExpandMode, Mode, PreviewCache, Tab,
 };
@@ -510,7 +510,9 @@ fn handle_settings_keybindings(code: KeyCode, modifiers: KeyModifiers, app: &mut
                 app.state.write().dirty = true;
             }
         }
-        (code, modifiers) if key_matches(KeyAction::SettingsResetAllKeybindings, code, modifiers) => {
+        (code, modifiers)
+            if key_matches(KeyAction::SettingsResetAllKeybindings, code, modifiers) =>
+        {
             crate::settings::update(|settings| settings.keybindings.reset_all());
             app.keybinding_conflict = None;
             app.state.write().dirty = true;
@@ -807,8 +809,9 @@ fn handle_viewer(code: KeyCode, modifiers: KeyModifiers, app: &mut App, path: &P
         }
     }
     match (code, modifiers) {
-        (code, modifiers) if key_matches(KeyAction::ViewerSearchCancel, code, modifiers)
-            && viewer_has_active_search(app) =>
+        (code, modifiers)
+            if key_matches(KeyAction::ViewerSearchCancel, code, modifiers)
+                && viewer_has_active_search(app) =>
         {
             // Esc on a committed search clears it without leaving the viewer.
             // ViewerBack still wins when there's no active search (handled below).
@@ -1021,14 +1024,25 @@ fn advance_viewer_search(app: &App, delta: i32) {
 /// Snapshot the current viewer's events without holding the state read lock
 /// across the (potentially slow) markdown render. Returns None if the viewer
 /// is in an empty/error state.
-fn snapshot_viewer_events(app: &App, path: &Path) -> Option<(String, String, Vec<crate::adapter::conversation::ConversationEvent>)> {
+fn snapshot_viewer_events(
+    app: &App,
+    path: &Path,
+) -> Option<(
+    String,
+    String,
+    Vec<crate::adapter::conversation::ConversationEvent>,
+)> {
     let s = app.state.read();
     let cache = s.conversation.as_ref()?;
     if cache.path != path || cache.events.is_empty() {
         return None;
     }
     let session = s.sessions.iter().find(|m| m.path == path)?;
-    Some((session.agent.to_string(), session.short_id(), cache.events.clone()))
+    Some((
+        session.agent.to_string(),
+        session.short_id(),
+        cache.events.clone(),
+    ))
 }
 
 /// `E` in viewer: render the current conversation as Markdown and write it
@@ -1196,9 +1210,15 @@ fn open_url(url: &str, app: &mut App) {
     let url_owned = url.to_string();
     tokio::spawn(async move {
         let res = if cfg!(target_os = "macos") {
-            tokio::process::Command::new("open").arg(&url_owned).status().await
+            tokio::process::Command::new("open")
+                .arg(&url_owned)
+                .status()
+                .await
         } else {
-            tokio::process::Command::new("xdg-open").arg(&url_owned).status().await
+            tokio::process::Command::new("xdg-open")
+                .arg(&url_owned)
+                .status()
+                .await
         };
         if let Err(err) = res {
             tracing::warn!(?err, "failed to open browser");
@@ -1232,17 +1252,13 @@ fn open_github_star(app: &mut App) {
         let outcome = star_via_gh_api(repo).await;
         match outcome {
             StarOutcome::Already => {
-                crate::settings::update(|s| {
-                    s.star_status = crate::settings::StarStatus::Starred
-                });
+                crate::settings::update(|s| s.star_status = crate::settings::StarStatus::Starred);
                 let mut s = state.write();
                 s.toast = Some("Already starred on GitHub".into());
                 s.dirty = true;
             }
             StarOutcome::Starred => {
-                crate::settings::update(|s| {
-                    s.star_status = crate::settings::StarStatus::Starred
-                });
+                crate::settings::update(|s| s.star_status = crate::settings::StarStatus::Starred);
                 let mut s = state.write();
                 s.toast = Some("Starred on GitHub!".into());
                 s.dirty = true;
@@ -1256,9 +1272,15 @@ fn open_github_star(app: &mut App) {
                 } // drop guard before awaiting
                 let url = format!("https://github.com/{}", repo);
                 let res = if cfg!(target_os = "macos") {
-                    tokio::process::Command::new("open").arg(&url).status().await
+                    tokio::process::Command::new("open")
+                        .arg(&url)
+                        .status()
+                        .await
                 } else {
-                    tokio::process::Command::new("xdg-open").arg(&url).status().await
+                    tokio::process::Command::new("xdg-open")
+                        .arg(&url)
+                        .status()
+                        .await
                 };
                 if let Err(err) = res {
                     tracing::warn!(?err, "failed to open browser fallback");
@@ -1534,8 +1556,7 @@ fn open_windows_terminal(_cwd: Option<&Path>, _cmd: &str) -> anyhow::Result<()> 
 #[cfg(target_os = "windows")]
 fn open_powershell(cwd: Option<&Path>, cmd: &str) -> anyhow::Result<()> {
     // Prefer pwsh (cross-platform Core), fall back to powershell.exe.
-    let exe = if crate::settings::which_exists("pwsh.exe")
-        || crate::settings::which_exists("pwsh")
+    let exe = if crate::settings::which_exists("pwsh.exe") || crate::settings::which_exists("pwsh")
     {
         "pwsh.exe"
     } else {
@@ -1698,8 +1719,8 @@ mod tests {
     use parking_lot::RwLock;
     use std::path::PathBuf;
     use std::sync::Arc;
-    use tokio::sync::Notify;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    use tokio::sync::Notify;
 
     fn test_app() -> App {
         App {
@@ -2282,7 +2303,10 @@ mod tests {
         );
 
         assert!(!should_exit);
-        assert!(session_path.exists(), "active sessions should not be deleted");
+        assert!(
+            session_path.exists(),
+            "active sessions should not be deleted"
+        );
         assert!(app.delete_confirm.is_some());
         assert!(app
             .delete_confirm

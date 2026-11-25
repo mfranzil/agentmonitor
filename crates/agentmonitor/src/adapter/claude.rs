@@ -1119,7 +1119,8 @@ mod tests {
         assert!(adapter.matches_process(
             &[
                 "C:\\Users\\yjw\\.claude\\local\\node.exe".to_string(),
-                "C:\\Users\\yjw\\.claude\\local\\node_modules\\@anthropic-ai\\claude-code\\cli.js".to_string(),
+                "C:\\Users\\yjw\\.claude\\local\\node_modules\\@anthropic-ai\\claude-code\\cli.js"
+                    .to_string(),
             ],
             None,
         ));

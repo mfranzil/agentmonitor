@@ -235,10 +235,7 @@ impl AgentAdapter for HermesAdapter {
                     |row| row.get(0),
                 )
                 .ok();
-            let count = live_count
-                .or(msg_count)
-                .unwrap_or(0)
-                .max(0) as usize;
+            let count = live_count.or(msg_count).unwrap_or(0).max(0) as usize;
 
             Ok::<_, anyhow::Error>((count, tokens))
         })
@@ -330,18 +327,15 @@ impl AgentAdapter for HermesAdapter {
                  ORDER BY timestamp DESC LIMIT ?2",
             )?;
 
-            let rows = stmt.query_map(
-                rusqlite::params![&id, limit as i64],
-                |row| {
-                    Ok((
-                        row.get::<_, String>(0)?,
-                        row.get::<_, Option<String>>(1)?,
-                        row.get::<_, Option<String>>(2)?,
-                        row.get::<_, Option<String>>(3)?,
-                        row.get::<_, f64>(4)?,
-                    ))
-                },
-            )?;
+            let rows = stmt.query_map(rusqlite::params![&id, limit as i64], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, Option<String>>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                    row.get::<_, Option<String>>(3)?,
+                    row.get::<_, f64>(4)?,
+                ))
+            })?;
 
             let mut out = Vec::new();
             for r in rows {
@@ -416,8 +410,16 @@ impl AgentAdapter for HermesAdapter {
         .context("spawn_blocking failed")??;
 
         let mut events = Vec::new();
-        for (role_raw, content, tool_calls, tool_name, _tool_call_id, reasoning, reasoning_content, ts) in
-            rows
+        for (
+            role_raw,
+            content,
+            tool_calls,
+            tool_name,
+            _tool_call_id,
+            reasoning,
+            reasoning_content,
+            ts,
+        ) in rows
         {
             let role = parse_role(&role_raw);
             let ts = unix_secs_to_dt(ts);
@@ -736,7 +738,11 @@ mod tests {
         // hermes-agent in path component (e.g. cwd argument) must NOT
         // count — only the hermes binary or hermes_cli.main module should.
         assert!(!adapter.matches_process(
-            &["bash".to_string(), "-c".to_string(), "ls /home/u/.hermes/hermes-agent".to_string()],
+            &[
+                "bash".to_string(),
+                "-c".to_string(),
+                "ls /home/u/.hermes/hermes-agent".to_string()
+            ],
             None,
         ));
         assert!(!adapter.matches_process(&["claude".to_string()], None));
@@ -786,10 +792,7 @@ mod tests {
             unix_secs_to_dt(30.0)
         );
         // Bare new session.
-        assert_eq!(
-            pick_updated_at(None, None, Some(7.0)),
-            unix_secs_to_dt(7.0)
-        );
+        assert_eq!(pick_updated_at(None, None, Some(7.0)), unix_secs_to_dt(7.0));
     }
 
     #[test]
@@ -817,7 +820,11 @@ mod tests {
             "function": {"name": "shell", "arguments": "{\"cmd\": \"ls\"}"}
         });
         match tool_call_to_block(&v) {
-            Some(Block::ToolUse { name, preview, input }) => {
+            Some(Block::ToolUse {
+                name,
+                preview,
+                input,
+            }) => {
                 assert_eq!(name, "shell");
                 assert!(preview.contains("shell"));
                 assert!(input.contains("\"cmd\""));
@@ -866,7 +873,10 @@ mod tests {
         .unwrap();
 
         let path = adapter.virtual_path_for("sess_a").unwrap();
-        let meta = adapter.parse_meta_full(&path).await.expect("parse_meta_full");
+        let meta = adapter
+            .parse_meta_full(&path)
+            .await
+            .expect("parse_meta_full");
         assert_eq!(meta.id, "sess_a");
         assert_eq!(meta.agent, "hermes");
         assert_eq!(meta.tokens.input, 1500);
@@ -935,7 +945,10 @@ mod tests {
         let (adapter, _dir, _db_path) = make_adapter_with_temp_db("missing-row");
         let path = adapter.virtual_path_for("nope").unwrap();
         // Session row absent: should return base meta without erroring.
-        let meta = adapter.parse_meta_fast(&path).await.expect("parse_meta_fast");
+        let meta = adapter
+            .parse_meta_fast(&path)
+            .await
+            .expect("parse_meta_fast");
         assert_eq!(meta.id, "nope");
         assert_eq!(meta.tokens.total(), 0);
         assert_eq!(meta.message_count, 0);

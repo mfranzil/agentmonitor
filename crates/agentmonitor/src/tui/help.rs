@@ -141,7 +141,8 @@ mod tests {
         // Every context referenced by an action's `context()` must appear in
         // the overlay's order list, otherwise that group of actions would be
         // silently hidden in the help modal.
-        let in_order: std::collections::HashSet<KeyContext> = CONTEXT_ORDER.iter().copied().collect();
+        let in_order: std::collections::HashSet<KeyContext> =
+            CONTEXT_ORDER.iter().copied().collect();
         for action in KeyAction::all() {
             let ctx = action.context();
             assert!(

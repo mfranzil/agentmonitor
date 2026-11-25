@@ -25,7 +25,12 @@ impl ClaudeDesktopAdapter {
         Self { root }
     }
 
-    fn base_meta(&self, path: &Path, size: u64, mtime: Option<chrono::DateTime<chrono::Utc>>) -> SessionMeta {
+    fn base_meta(
+        &self,
+        path: &Path,
+        size: u64,
+        mtime: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> SessionMeta {
         SessionMeta {
             agent: self.id(),
             id: path
@@ -121,10 +126,7 @@ impl AgentAdapter for ClaudeDesktopAdapter {
             }
         }
         if !is_native_first_type(first_type.as_deref()) {
-            anyhow::bail!(
-                "not a Claude Desktop conversation: {}",
-                path.display()
-            );
+            anyhow::bail!("not a Claude Desktop conversation: {}", path.display());
         }
         meta.status = infer_status(meta.updated_at);
         Ok(meta)
@@ -155,10 +157,7 @@ impl AgentAdapter for ClaudeDesktopAdapter {
             }
         }
         if !is_native_first_type(first_type.as_deref()) {
-            anyhow::bail!(
-                "not a Claude Desktop conversation: {}",
-                path.display()
-            );
+            anyhow::bail!("not a Claude Desktop conversation: {}", path.display());
         }
         if meta.message_count > 0 && meta.started_at.is_none() {
             meta.started_at = meta.updated_at;
@@ -182,11 +181,7 @@ impl AgentAdapter for ClaudeDesktopAdapter {
             .filter_map(|e| e.ok())
             .filter(|e| e.file_type().is_file())
             .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("jsonl"))
-            .filter(|e| {
-                e.file_name()
-                    .to_string_lossy()
-                    != "audit.jsonl"
-            })
+            .filter(|e| e.file_name().to_string_lossy() != "audit.jsonl")
             .map(|e| e.path().to_path_buf())
             .collect();
 

@@ -30,11 +30,9 @@ impl Default for Config {
             codex_root: home.as_ref().map(|h| h.join(".codex").join("sessions")),
             gemini_root: home.as_ref().map(|h| h.join(".gemini").join("tmp")),
             hermes_root: home.as_ref().map(|h| h.join(".hermes")),
-            opencode_root: home.as_ref().map(|h| {
-                h.join(".local")
-                    .join("share")
-                    .join("opencode")
-            }),
+            opencode_root: home
+                .as_ref()
+                .map(|h| h.join(".local").join("share").join("opencode")),
         }
     }
 }

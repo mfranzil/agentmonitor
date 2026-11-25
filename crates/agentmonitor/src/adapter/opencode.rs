@@ -58,6 +58,49 @@ impl OpencodeAdapter {
     }
 }
 
+/// Adapt the current OpenCode schema to the legacy queries below. Views are
+/// connection-local: opening the monitor never modifies the OpenCode database.
+fn open_database(db_path: &Path) -> Result<rusqlite::Connection> {
+    let conn =
+        rusqlite::Connection::open_with_flags(db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .with_context(|| format!("open opencode db {}", db_path.display()))?;
+    let has_v2: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'session_v2')",
+        [],
+        |row| row.get(0),
+    )?;
+    if has_v2 {
+        conn.execute_batch(
+            r#"
+            CREATE TEMP VIEW session AS
+                SELECT id, project_id, directory, COALESCE(title, '') AS title,
+                       version, time_created, time_updated, time_archived
+                FROM main.session_v2;
+            CREATE TEMP VIEW message AS
+                SELECT id, session_id, time_created,
+                       json_set(data, '$.role', type,
+                           '$.modelID', json_extract(data, '$.model.id')) AS data
+                FROM main.session_message
+                WHERE type IN ('user', 'assistant', 'system', 'synthetic', 'compaction');
+            CREATE TEMP VIEW part AS
+                SELECT m.id AS message_id, m.session_id, m.time_created,
+                       j.value AS data
+                FROM main.session_message m, json_each(m.data, '$.content') j
+                WHERE m.type = 'assistant'
+                UNION ALL
+                SELECT id, session_id, time_created,
+                       json_object('type', 'text', 'text',
+                           CASE WHEN type = 'compaction'
+                                THEN json_extract(data, '$.summary')
+                                ELSE json_extract(data, '$.text') END)
+                FROM main.session_message
+                WHERE type IN ('user', 'system', 'synthetic', 'compaction');
+            "#,
+        )?;
+    }
+    Ok(conn)
+}
+
 #[async_trait]
 impl AgentAdapter for OpencodeAdapter {
     fn id(&self) -> &'static str {
@@ -105,13 +148,12 @@ impl AgentAdapter for OpencodeAdapter {
 
         let id = session_id.clone();
         let row = task::spawn_blocking(move || {
-            let conn = rusqlite::Connection::open(&db_path)
-                .with_context(|| format!("open opencode db {}", db_path.display()))?;
+            let conn = open_database(&db_path)?;
 
             let mut stmt = conn.prepare(
                 "SELECT s.directory, s.title, s.version, s.time_created, s.time_updated, p.name, \
                  (SELECT json_extract(m.data, '$.modelID') FROM message m \
-                  WHERE m.session_id = s.id ORDER BY m.time_created DESC LIMIT 1) as model_id \
+                  WHERE m.session_id = s.id AND json_extract(m.data, '$.modelID') IS NOT NULL ORDER BY m.time_created DESC LIMIT 1) as model_id \
                  FROM session s \
                  LEFT JOIN project p ON s.project_id = p.id \
                  WHERE s.id = ?1",
@@ -171,8 +213,7 @@ impl AgentAdapter for OpencodeAdapter {
 
         let id = session_id;
         let (count, tokens) = task::spawn_blocking(move || {
-            let conn = rusqlite::Connection::open(&db_path)
-                .with_context(|| format!("open opencode db {}", db_path.display()))?;
+            let conn = open_database(&db_path)?;
 
             let count: i64 = conn.query_row(
                 "SELECT COUNT(*) FROM message WHERE session_id = ?1",
@@ -201,8 +242,7 @@ impl AgentAdapter for OpencodeAdapter {
                                 tokens.cache_read = tokens.cache_read.saturating_add(read);
                             }
                             if let Some(write) = cache.get("write").and_then(|v| v.as_u64()) {
-                                tokens.cache_creation =
-                                    tokens.cache_creation.saturating_add(write);
+                                tokens.cache_creation = tokens.cache_creation.saturating_add(write);
                             }
                         }
                     }
@@ -227,14 +267,13 @@ impl AgentAdapter for OpencodeAdapter {
             .context("opencode db path not configured")?;
 
         let rows = task::spawn_blocking(move || {
-            let conn = rusqlite::Connection::open(&db_path)
-                .with_context(|| format!("open opencode db {}", db_path.display()))?;
+            let conn = open_database(&db_path)?;
 
             let mut stmt = conn.prepare(
                 "SELECT s.id, s.directory, s.title, s.version, s.time_created, s.time_updated, \
                  p.name, \
                  (SELECT json_extract(m.data, '$.modelID') FROM message m \
-                  WHERE m.session_id = s.id ORDER BY m.time_created DESC LIMIT 1) as model_id \
+                  WHERE m.session_id = s.id AND json_extract(m.data, '$.modelID') IS NOT NULL ORDER BY m.time_created DESC LIMIT 1) as model_id \
                  FROM session s \
                  LEFT JOIN project p ON s.project_id = p.id \
                  WHERE s.time_archived IS NULL \
@@ -295,8 +334,7 @@ impl AgentAdapter for OpencodeAdapter {
         let id = session_id;
         let limit = n;
         let messages = task::spawn_blocking(move || {
-            let conn = rusqlite::Connection::open(&db_path)
-                .with_context(|| format!("open opencode db {}", db_path.display()))?;
+            let conn = open_database(&db_path)?;
 
             // Fetch last N messages with their text parts aggregated.
             let mut stmt = conn.prepare(
@@ -331,7 +369,10 @@ impl AgentAdapter for OpencodeAdapter {
         for (msg_data, time_created, texts) in messages {
             let v: Value = serde_json::from_str(&msg_data).unwrap_or(Value::Null);
 
-            let role_str = v.get("role").and_then(|r| r.as_str()).unwrap_or("assistant");
+            let role_str = v
+                .get("role")
+                .and_then(|r| r.as_str())
+                .unwrap_or("assistant");
             let role = match role_str {
                 "user" => MessageRole::User,
                 "assistant" => MessageRole::Assistant,
@@ -372,8 +413,7 @@ impl AgentAdapter for OpencodeAdapter {
 
         let id = session_id;
         let messages = task::spawn_blocking(move || {
-            let conn = rusqlite::Connection::open(&db_path)
-                .with_context(|| format!("open opencode db {}", db_path.display()))?;
+            let conn = open_database(&db_path)?;
 
             // Fetch all messages with their parts.
             let mut msg_stmt = conn.prepare(
@@ -467,8 +507,16 @@ fn part_to_block(part: &Value) -> Option<Block> {
             }
         }
         "tool" => {
-            let tool_name = part.get("tool").and_then(|t| t.as_str()).unwrap_or("?");
-            let call_id = part.get("callID").and_then(|t| t.as_str()).unwrap_or("");
+            let tool_name = part
+                .get("tool")
+                .or_else(|| part.get("name"))
+                .and_then(|t| t.as_str())
+                .unwrap_or("?");
+            let call_id = part
+                .get("callID")
+                .or_else(|| part.get("id"))
+                .and_then(|t| t.as_str())
+                .unwrap_or("");
             let state = part.get("state");
             let status = state
                 .and_then(|s| s.get("status"))
@@ -591,6 +639,121 @@ fn first_line_truncated(s: &str, max: usize) -> String {
 mod tests {
     use super::*;
 
+    #[tokio::test]
+    async fn v2_schema_uses_current_sessions_and_embedded_content() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("opencode.db");
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE project (id TEXT PRIMARY KEY, name TEXT);
+             CREATE TABLE session (id TEXT);
+             INSERT INTO session VALUES ('stale_legacy_session');
+             CREATE TABLE session_v2 (
+                 id TEXT PRIMARY KEY, project_id TEXT, directory TEXT, title TEXT,
+                 version TEXT, time_created INTEGER, time_updated INTEGER, time_archived INTEGER);
+             INSERT INTO session_v2 VALUES ('ses_current', 'p', '/project', NULL, '2', 1000, 2000, NULL);
+             INSERT INTO session_v2 VALUES ('ses_archived', 'p', '/old', 'old', '2', 1000, 2000, 3000);
+             CREATE TABLE session_message (
+                 id TEXT PRIMARY KEY, session_id TEXT, type TEXT, time_created INTEGER, data TEXT);",
+        ).unwrap();
+        let messages = [
+            ("u", "user", serde_json::json!({"text": "hello"})),
+            (
+                "a",
+                "assistant",
+                serde_json::json!({
+                    "model": {"id": "test-model"},
+                    "tokens": {"input": 12, "output": 5, "cache": {"read": 20, "write": 3}},
+                    "content": [
+                        {"type": "text", "text": "answer"},
+                        {"type": "reasoning", "text": "reason"},
+                        {"type": "tool", "id": "call", "name": "bash",
+                         "state": {"status": "completed", "input": {"command": "pwd"}}}
+                    ]
+                }),
+            ),
+            ("i", "idle", serde_json::json!({"outcome": "succeeded"})),
+        ];
+        for (id, kind, data) in messages {
+            conn.execute(
+                "INSERT INTO session_message VALUES (?1, 'ses_current', ?2, 2000, ?3)",
+                rusqlite::params![id, kind, data.to_string()],
+            )
+            .unwrap();
+        }
+        drop(conn);
+        let adapter = OpencodeAdapter::new(Some(db_path.clone()));
+        let sessions = adapter.scan_all().await.unwrap();
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].id, "ses_current");
+        assert_eq!(sessions[0].model.as_deref(), Some("test-model"));
+        let full = adapter.parse_meta_full(&sessions[0].path).await.unwrap();
+        assert_eq!(full.message_count, 2);
+        assert_eq!(
+            (
+                full.tokens.input,
+                full.tokens.output,
+                full.tokens.cache_read,
+                full.tokens.cache_creation
+            ),
+            (12, 5, 20, 3)
+        );
+        let previews = adapter.tail_messages(&sessions[0].path, 10).await.unwrap();
+        assert!(previews
+            .iter()
+            .any(|p| p.role == MessageRole::User && p.text == "hello"));
+        assert!(previews
+            .iter()
+            .any(|p| p.role == MessageRole::Assistant && p.text == "answer"));
+        let conversation = adapter.load_conversation(&sessions[0].path).await.unwrap();
+        let blocks: Vec<_> = conversation.iter().flat_map(|e| &e.blocks).collect();
+        assert!(blocks
+            .iter()
+            .any(|b| matches!(b, Block::Text(t) if t == "hello")));
+        assert!(blocks
+            .iter()
+            .any(|b| matches!(b, Block::Thinking(t) if t == "reason")));
+        assert!(blocks
+            .iter()
+            .any(|b| matches!(b, Block::ToolUse { name, .. } if name == "bash")));
+        // Temporary compatibility views must never replace or populate legacy tables on disk.
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        let legacy: String = conn
+            .query_row("SELECT id FROM session", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(legacy, "stale_legacy_session");
+        assert_eq!(
+            conn.query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type = 'view'",
+                [],
+                |r| r.get::<_, i64>(0)
+            )
+            .unwrap(),
+            0
+        );
+    }
+
+    #[test]
+    fn legacy_schema_is_unchanged_and_missing_database_is_not_created() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("legacy.db");
+        let conn = rusqlite::Connection::open(&path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE session (id TEXT); INSERT INTO session VALUES ('legacy');",
+        )
+        .unwrap();
+        drop(conn);
+        let conn = open_database(&path).unwrap();
+        assert_eq!(
+            conn.query_row("SELECT id FROM session", [], |r| r.get::<_, String>(0))
+                .unwrap(),
+            "legacy"
+        );
+        let missing = dir.path().join("missing.db");
+        assert!(open_database(&missing).is_err());
+        assert!(!missing.exists());
+    }
+
     #[test]
     fn parses_session_id_from_virtual_path() {
         let adapter = OpencodeAdapter::new(Some(PathBuf::from(
@@ -606,12 +769,8 @@ mod tests {
     #[test]
     fn rejects_non_virtual_path() {
         let adapter = OpencodeAdapter::new(None);
-        assert!(!adapter.owns_path(Path::new(
-            "/home/user/.local/share/opencode/opencode.db"
-        )));
-        assert!(!adapter.owns_path(Path::new(
-            "/home/user/.claude/projects/session.jsonl"
-        )));
+        assert!(!adapter.owns_path(Path::new("/home/user/.local/share/opencode/opencode.db")));
+        assert!(!adapter.owns_path(Path::new("/home/user/.claude/projects/session.jsonl")));
     }
 
     #[test]
@@ -673,7 +832,10 @@ mod tests {
         let adapter = OpencodeAdapter::new(Some(db_path));
         let sessions = adapter.scan_all().await.expect("scan_all should succeed");
 
-        assert!(!sessions.is_empty(), "expected at least one opencode session");
+        assert!(
+            !sessions.is_empty(),
+            "expected at least one opencode session"
+        );
         for s in &sessions {
             assert_eq!(s.agent, "opencode");
             assert!(!s.id.is_empty(), "session id should not be empty");
@@ -749,7 +911,11 @@ mod tests {
             .await
             .expect("tail_messages should succeed");
 
-        println!("Session {}: got {} preview messages", first.id, previews.len());
+        println!(
+            "Session {}: got {} preview messages",
+            first.id,
+            previews.len()
+        );
         for (i, p) in previews.iter().enumerate() {
             println!(
                 "  [{}] {:?}: {}",
@@ -790,12 +956,7 @@ mod tests {
             events.len()
         );
         for (i, ev) in events.iter().enumerate() {
-            println!(
-                "  [{}] {:?}: {} blocks",
-                i,
-                ev.role,
-                ev.blocks.len()
-            );
+            println!("  [{}] {:?}: {} blocks", i, ev.role, ev.blocks.len());
             for (j, block) in ev.blocks.iter().enumerate() {
                 let desc = match block {
                     Block::Text(_) => "Text",

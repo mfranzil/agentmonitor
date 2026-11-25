@@ -658,13 +658,12 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("settings.json");
         let mut s = Settings::default();
-        s.keybindings.set_binding(
-            KeyAction::Quit,
-            KeyBinding::plain(KeyCodeSpec::Char('x')),
-        );
+        s.keybindings
+            .set_binding(KeyAction::Quit, KeyBinding::plain(KeyCodeSpec::Char('x')));
 
         s.save_to_path(&path).unwrap();
-        let back: Settings = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        let back: Settings =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
 
         assert!(back.keybindings.matches_action(
             KeyAction::Quit,
@@ -685,12 +684,16 @@ mod tests {
         let text = serde_json::to_string(&s).unwrap();
         let back: Settings = serde_json::from_str(&text).unwrap();
 
-        assert!(back
-            .keybindings
-            .matches_action(KeyAction::Quit, crossterm::event::KeyCode::Char('x'), crossterm::event::KeyModifiers::empty()));
-        assert!(!back
-            .keybindings
-            .matches_action(KeyAction::Quit, crossterm::event::KeyCode::Char('q'), crossterm::event::KeyModifiers::empty()));
+        assert!(back.keybindings.matches_action(
+            KeyAction::Quit,
+            crossterm::event::KeyCode::Char('x'),
+            crossterm::event::KeyModifiers::empty()
+        ));
+        assert!(!back.keybindings.matches_action(
+            KeyAction::Quit,
+            crossterm::event::KeyCode::Char('q'),
+            crossterm::event::KeyModifiers::empty()
+        ));
     }
 
     #[test]

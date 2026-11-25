@@ -205,7 +205,11 @@ fn highlight_for_search(
         return line.clone();
     };
     let is_current = pos == search.current;
-    let bg = if is_current { Color::Yellow } else { Color::DarkGray };
+    let bg = if is_current {
+        Color::Yellow
+    } else {
+        Color::DarkGray
+    };
     let fg = Color::Black;
     let highlight = Style::default().bg(bg).fg(fg).add_modifier(Modifier::BOLD);
 
@@ -253,10 +257,7 @@ pub(crate) fn refresh_search_matches(cache: &mut ConversationCache) {
     let lines = build_lines(&cache.events, cache.expand);
     let matches = find_matches(&lines, &search.query);
     let cursor_line = cache.scroll as usize;
-    let current = matches
-        .iter()
-        .position(|&i| i >= cursor_line)
-        .unwrap_or(0);
+    let current = matches.iter().position(|&i| i >= cursor_line).unwrap_or(0);
     search.matches = matches;
     search.current = current;
 }
@@ -694,7 +695,10 @@ mod tests {
             .flat_map(|l| l.spans.iter())
             .map(|s| s.content.as_ref())
             .collect();
-        assert!(all_text.contains("row 42"), "row marker missing: {all_text}");
+        assert!(
+            all_text.contains("row 42"),
+            "row marker missing: {all_text}"
+        );
         assert!(all_text.contains('7'), "events count missing: {all_text}");
 
         crate::settings::settings().write().keybindings = original;

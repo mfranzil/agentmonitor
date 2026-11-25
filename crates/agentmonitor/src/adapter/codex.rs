@@ -97,6 +97,27 @@ impl AgentAdapter for CodexAdapter {
         // First line is session_meta for codex.
         if let Some(line) = reader.next_line().await? {
             if let Ok(v) = serde_json::from_str::<Value>(&line) {
+                // Codex persists spawned workers as normal rollout files. They
+                // are useful to Codex itself, but should not become top-level
+                // AgentMonitor sessions. `parent_thread_id` is the canonical
+                // current signal; the other checks cover older rollout shapes.
+                let payload = v.get("payload");
+                let has_parent = payload
+                    .and_then(|p| p.get("parent_thread_id"))
+                    .map(|parent| !parent.is_null())
+                    .unwrap_or(false);
+                let subagent_thread_source = payload
+                    .and_then(|p| p.get("thread_source"))
+                    .and_then(Value::as_str)
+                    == Some("subagent");
+                let subagent_source = payload
+                    .and_then(|p| p.get("source"))
+                    .and_then(Value::as_object)
+                    .map(|source| source.contains_key("subagent"))
+                    .unwrap_or(false);
+                if has_parent || subagent_thread_source || subagent_source {
+                    anyhow::bail!("codex subagent session");
+                }
                 fold_codex_line(&v, &mut meta);
             }
         }
@@ -867,9 +888,8 @@ mod tests {
             None,
         ));
         // Negative: unrelated exe must not match.
-        assert!(!adapter.matches_process(
-            &["C:\\Windows\\System32\\notepad.exe".to_string()],
-            None,
-        ));
+        assert!(
+            !adapter.matches_process(&["C:\\Windows\\System32\\notepad.exe".to_string()], None,)
+        );
     }
 }

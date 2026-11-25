@@ -116,7 +116,9 @@ impl TokenCache {
         if self.inner.read().is_empty() {
             return;
         }
-        self.inner.write().retain(|path, _| live_paths.contains(path));
+        self.inner
+            .write()
+            .retain(|path, _| live_paths.contains(path));
     }
 
     pub fn len(&self) -> usize {
@@ -207,12 +209,7 @@ async fn refresh_all(
         // trend sample. Doing this here (vs. inside write_back) means we
         // record exactly once per refresh wave, regardless of how many
         // individual sessions were updated.
-        let total: u64 = state
-            .read()
-            .sessions
-            .iter()
-            .map(|m| m.tokens.total())
-            .sum();
+        let total: u64 = state.read().sessions.iter().map(|m| m.tokens.total()).sum();
         trend.record(SystemTime::now(), total);
     }
     count
@@ -331,7 +328,10 @@ fn write_back(
     });
     match outcome {
         WriteBackOutcome::Skipped | WriteBackOutcome::Unchanged => false,
-        WriteBackOutcome::Regression { old_total, new_total } => {
+        WriteBackOutcome::Regression {
+            old_total,
+            new_total,
+        } => {
             tracing::debug!(
                 path = %path.display(),
                 new = new_total,
@@ -340,7 +340,10 @@ fn write_back(
             );
             false
         }
-        WriteBackOutcome::Updated { old_total, new_total } => {
+        WriteBackOutcome::Updated {
+            old_total,
+            new_total,
+        } => {
             s.dirty = true;
             tracing::info!(
                 path = %path.display(),

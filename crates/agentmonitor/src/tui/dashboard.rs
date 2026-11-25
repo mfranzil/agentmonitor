@@ -77,10 +77,7 @@ fn aggregates_for(
                 .elapsed()
                 .map(|d| d.as_secs() >= 60)
                 .unwrap_or(true);
-            if cached.generation == generation
-                && cached.include_cache == include_cache
-                && !stale
-            {
+            if cached.generation == generation && cached.include_cache == include_cache && !stale {
                 return cached.clone();
             }
         }
@@ -143,11 +140,9 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
     // accumulates across renders without being re-derived from scratch.
     let now_systime = SystemTime::now();
     let trend_window = std::time::Duration::from_secs(60 * 30);
-    let token_buckets = app.token_trend.buckets(
-        now_systime,
-        std::time::Duration::from_secs(60),
-        30,
-    );
+    let token_buckets =
+        app.token_trend
+            .buckets(now_systime, std::time::Duration::from_secs(60), 30);
     let token_window_total = app.token_trend.rate_in_window(now_systime, trend_window);
     let has_trend = token_buckets.iter().any(|&v| v > 0);
 
@@ -235,8 +230,7 @@ pub fn render(frame: &mut Frame, area: Rect, app: &App) {
         .take(top_n.max(1))
         .cloned()
         .collect();
-    let project_focused =
-        app.dashboard_cursor == crate::app::DashboardCursor::Project;
+    let project_focused = app.dashboard_cursor == crate::app::DashboardCursor::Project;
     let selected_project = if project_focused {
         Some(app.selected_project.min(projects.len().saturating_sub(1)))
     } else {
@@ -294,7 +288,10 @@ fn render_overview(frame: &mut Frame, area: Rect, d: OverviewData<'_>) {
         ),
         bold(format!("{}", d.total_sessions)),
         Span::styled(
-            format!("   {}", pad_display_width(t("dashboard.last24h"), label_width)),
+            format!(
+                "   {}",
+                pad_display_width(t("dashboard.last24h"), label_width)
+            ),
             theme::muted(),
         ),
         Span::styled(
@@ -443,11 +440,7 @@ fn build_agent_lines(rows: &[AgentTokenRow], width_budget: usize) -> Vec<Vec<Spa
 /// 1 sessions row + (optional 1 rate row) + N agent rows + 1 process row.
 /// Min 5 keeps behaviour identical to the legacy fixed layout when nothing
 /// wraps and there's no trend data yet.
-fn compute_overview_height(
-    area_width: u16,
-    rows: &[AgentTokenRow],
-    has_trend: bool,
-) -> u16 {
+fn compute_overview_height(area_width: u16, rows: &[AgentTokenRow], has_trend: bool) -> u16 {
     let label_width = 10usize;
     let inner_width = (area_width as usize).saturating_sub(2);
     let budget = inner_width.saturating_sub(label_width);

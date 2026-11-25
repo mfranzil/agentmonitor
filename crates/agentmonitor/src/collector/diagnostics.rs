@@ -69,7 +69,8 @@ impl DiagnosticsStore {
     }
 
     pub fn record_fs_path_processed(&self) {
-        self.fs_watch_paths_processed.fetch_add(1, Ordering::Relaxed);
+        self.fs_watch_paths_processed
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     pub fn record_fs_reconcile(&self) {

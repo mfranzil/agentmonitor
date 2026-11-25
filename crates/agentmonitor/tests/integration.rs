@@ -97,7 +97,10 @@ where
         tokio::time::sleep(Duration::from_millis(step)).await;
         elapsed += step;
     }
-    panic!("predicate {} never became true within {}ms", label, timeout_ms);
+    panic!(
+        "predicate {} never became true within {}ms",
+        label, timeout_ms
+    );
 }
 
 /// fs_watch installs notify watchers asynchronously after spawn; FSEvents on
@@ -167,8 +170,16 @@ async fn harness() -> (Harness, tempfile::TempDir) {
         let dirty = dirty.clone();
         let token_dirty = token_dirty.clone();
         tokio::spawn(async move {
-            token_refresh::run(adapters, state, cache, trend, diagnostics, token_dirty, dirty)
-                .await;
+            token_refresh::run(
+                adapters,
+                state,
+                cache,
+                trend,
+                diagnostics,
+                token_dirty,
+                dirty,
+            )
+            .await;
         });
     }
 
@@ -252,9 +263,9 @@ async fn unknown_first_type_does_not_silently_drop_session() {
     wait_for(
         move || {
             let s = state.read();
-            s.sessions
-                .iter()
-                .any(|m| m.path.file_name().and_then(|n| n.to_str()) == Some("permission-first.jsonl"))
+            s.sessions.iter().any(|m| {
+                m.path.file_name().and_then(|n| n.to_str()) == Some("permission-first.jsonl")
+            })
         },
         15_000,
         "permission-mode first-line session is tracked",
